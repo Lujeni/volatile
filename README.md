@@ -9,6 +9,9 @@ The main goal of the script is not to replace cookiecutter, or even [GitLab incl
 
 Simple use case, Automatically add the GitLab SAST tasks [examples](Volatile/templates/example.yml) on .gitlab-ci.yml
 
+### Similar (and/or better) tool
+- https://github.com/lindell/multi-gitter
+
 ## Usage
 ### Running locally
 #### Requirements
