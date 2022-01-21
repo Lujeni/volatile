@@ -5,12 +5,10 @@ Fast and easy way to make changes in multiple GitLab project based on template.
 After looking for a tool to simply enforce a development practice at the scale of a GitLab instance,
 I didn't find anything simple so I started this little script.
 
-The main goal of the script is not to replace GitLab Template, cookiecutter, or even [GitLab includes](https://docs.gitlab.com/ee/ci/yaml/includes.html) but to facilitate adoption and reduce friction.
-
 ### Some examples
 - Add new task on every `.gitlab-ci.yml` (check [examples](Volatile/templates/example.yml))
-- Update a particular file (dependencies, gitignore [...])
-- In the context of governance, ensure that all projects have this content
+- Apply new change on particular file (e.g. gitignore)
+- In the context of governance, ensure that all projects have this content on this specific file
 
 ### Similar (and/or better) tool
 - https://github.com/lindell/multi-gitter
