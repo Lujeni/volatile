@@ -40,13 +40,15 @@ def get_signature_from_gitlab_file(file):
 
 
 class GitlabHelper(object):
-    def __init__(self, url, token, timeout, search):
+    def __init__(self, url, token, timeout, search, mr_description):
         self.client = None
         self.timeout = timeout
         self.token = token
         self.search = search
         self.url = url
         self.groups = []
+        #
+        self.mr_description = mr_description
 
     def connect(self):
         """Performs an authentication via private token
@@ -155,6 +157,7 @@ class GitlabHelper(object):
 
         project.mergerequests.create(
             {
+                "description": self.mr_description,
                 "remove_source_branch": True,
                 "source_branch": branch,
                 "target_branch": project.default_branch,
@@ -169,6 +172,8 @@ def main():
     GITLAB_TARGET_FILE = getenv("GITLAB_TARGET_FILE")
     GITLAB_TIMEOUT = getenv("GITLAB_TIMEOUT", 3)
     GITLAB_SEARCH = getenv("GITLAB_SEARCH", None)
+    #
+    GITLAB_MR_DESCRIPTION = getenv("GITLAB_MR_DESCRIPTION", None)
     #
     VOLATILE_TEMPLATE_PATH = getenv("VOLATILE_TEMPLATE_PATH")
     VOLATILE_MERGE_REQUEST = literal_eval(getenv("VOLATILE_MERGE_REQUEST", "True"))
@@ -198,6 +203,7 @@ def main():
         token=GITLAB_PRIVATE_TOKEN,
         timeout=GITLAB_TIMEOUT,
         search=GITLAB_SEARCH,
+        mr_description=GITLAB_MR_DESCRIPTION,
     )
     gitlab_helper.connect()
     for project in gitlab_helper.get_projects():
