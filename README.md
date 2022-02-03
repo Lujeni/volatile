@@ -1,3 +1,5 @@
+[![Docker Image CI](https://github.com/Lujeni/volatile/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Lujeni/volatile/actions/workflows/docker-image.yml) [![Python application](https://github.com/Lujeni/volatile/actions/workflows/python-app.yml/badge.svg)](https://github.com/Lujeni/volatile/actions/workflows/python-app.yml)
+
 ## Volatile
 Fast and easy way to make changes in multiple GitLab project based on template.
 
