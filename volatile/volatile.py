@@ -4,8 +4,16 @@ from ast import literal_eval
 from os import getenv
 from pathlib import Path
 from sys import exit
+from time import sleep
 
 from gitlab import Gitlab
+from prometheus_client import Gauge, start_http_server
+
+PROMETHEUS_PROJECTS_TOTAL = Gauge("volatile_projects_total", ".")
+PROMETHEUS_PROJECTS_DONE = Gauge("volatile_projects_done", ".")
+PROMETHEUS_PROJECTS_REFUSED = Gauge("volatile_projects_refused", ".")
+PROMETHEUS_PROJECTS_WAITING = Gauge("volatile_projects_waiting", ".")
+PROMETHEUS_PROJECTS_MISSING = Gauge("volatile_projects_missing", ".")
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -25,7 +33,7 @@ def get_signature_from_file(path):
     signature = []
     content = Path(path).read_text()
     for line in content:
-        signature.append(line.strip())
+        signature.append(line.strip().replace(" ", ""))
     return "".join(signature), content
 
 
@@ -35,7 +43,7 @@ def get_signature_from_gitlab_file(file):
     """
     signature = []
     for line in file.decode().splitlines():
-        signature.append(line.decode().strip())
+        signature.append(line.decode().strip().replace(" ", ""))
     return "".join(signature)
 
 
@@ -71,12 +79,14 @@ class GitlabHelper(object):
         :rtype: list
         """
         try:
-            return [
+            projects = [
                 self.client.projects.get(project.id)
                 for project in self.client.projects.list(
                     all=True, include_subgroups=True, search=self.search or ""
                 )
             ]
+            PROMETHEUS_PROJECTS_TOTAL.set(len(projects))
+            return projects
         except Exception as e:
             logging.error("unable to get projects :: {}".format(e))
         return []
@@ -164,6 +174,7 @@ class GitlabHelper(object):
                 "title": f"Volatile - new version of {project_file.file_path}",
             }
         )
+        PROMETHEUS_PROJECTS_WAITING.inc()
 
 
 def main():
@@ -205,6 +216,8 @@ def main():
         search=GITLAB_SEARCH,
         mr_description=GITLAB_MR_DESCRIPTION,
     )
+
+    start_http_server(8000)
     gitlab_helper.connect()
     for project in gitlab_helper.get_projects():
         logging.info(f"{project.name} :: {GITLAB_TARGET_FILE}")
@@ -213,11 +226,13 @@ def main():
         )
         if not gitlab_file:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: not found")
+            PROMETHEUS_PROJECTS_MISSING.inc()
             continue
 
         gitlab_file_signature = get_signature_from_gitlab_file(file=gitlab_file)
         if template_file_signature in gitlab_file_signature:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: already good")
+            PROMETHEUS_PROJECTS_DONE.inc()
             continue
 
         if not VOLATILE_MERGE_REQUEST:
@@ -231,6 +246,9 @@ def main():
         gitlab_helper.create_merge_request(
             project=project, project_file=gitlab_file, content=template_file_content
         )
+    # TODO: support push-gateway
+    logging.debug("waiting the silly scrapper")
+    sleep(120)
 
 
 if __name__ == "__main__":
