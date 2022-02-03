@@ -33,6 +33,9 @@ $ virtualenv .venv && source .venv/bin/activate
 (.venv) $ python volatile/volatile.py
 ```
 
+### Using Kubernetes
+You can use this simple [manifest](kubernetes.yml), before using it, replace with your current setup (e.g. GITLAB_URL)
+
 #### Configuration
 Volatile supports multiple environment variables for configuration:
 

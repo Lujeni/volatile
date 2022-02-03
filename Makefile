@@ -1,12 +1,10 @@
+NS := lujenii
 PRJ := volatile
 PKG := $(subst -,_,$(PRJ))
+IMG := docker.io/$(NS)/$(PRJ)
 
 TAG ?= $(shell git describe --tags)
 WHO ?= $(shell whoami)
-
-REGISTRY ?=  $(shell echo registry.numberly.in/$(NS)/$(GROUP)/ | sed 's/\/\//\//')
-
-IMG := $(REGISTRY)$(PRJ)
 
 help:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort

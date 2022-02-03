@@ -1,0 +1,99 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: volatile
+  labels:
+    component: backend
+    environment: production
+    managed-by: "volatile"
+    name: volatile
+    release: "1.0.0-170-g2a9a73f"
+    who: lujeni
+data:
+  GITLAB_PRIVATE_TOKEN: "<change-me>"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volatile
+  labels:
+    component: backend
+    environment: production
+    managed-by: "volatile"
+    name: volatile
+    release: "1.0.0-170-g2a9a73f"
+    who: lujeni
+data:
+  GITLAB_URL: "https://gitlab.com"
+  GITLAB_TARGET_FILE: ".gitlab-ci.yml"
+  VOLATILE_TEMPLATE_PATH: "volatile/templates/example.yml"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: volatile
+  labels:
+    component: backend
+    environment: production
+    managed-by: "volatile"
+    name: volatile
+    release: "1.0.0-170-g2a9a73f"
+    who: lujeni
+spec:
+  selector:
+    matchLabels:
+      component: backend
+      environment: production
+      name: volatile
+  replicas: 1
+  template:
+    metadata:
+      name: backend-volatile
+      annotations:
+        logging.active: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+      labels:
+        component: backend
+        environment: production
+        managed-by: "volatile"
+        name: volatile
+        release: "1.0.0-170-g2a9a73f"
+        who: lujeni
+    spec:
+      containers:
+      - name: volatile
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 65534
+        image: "docker.io/lujenii/volatile:latest"
+        imagePullPolicy: always
+        ports:
+          - name: http
+            containerPort: 8000
+            protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+        envFrom:
+        - configMapRef:
+            name: volatile
+        - secretRef:
+            name: volatile
+        livenessProbe:
+          httpGet:
+            path: /health-check
+            port: 8000
+          initialDelaySeconds: 20
+          failureThreshold: 3
+          periodSeconds: 3
+          timeoutSeconds: 10
