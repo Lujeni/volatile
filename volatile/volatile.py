@@ -1,6 +1,7 @@
 #!/usr/bin/python env
 import logging
 from ast import literal_eval
+from hashlib import sha256
 from os import getenv
 from pathlib import Path
 from sys import exit
@@ -105,8 +106,7 @@ class GitlabHelper(object):
         """
         try:
             return project.files.get(file_path=file_path, ref=project.default_branch)
-        except Exception as e:
-            logging.error(f"get_file :: {project.name} :: {file_path} :: {e}")
+        except Exception:
             return None
         return None
 
@@ -141,7 +141,29 @@ class GitlabHelper(object):
             )
             return None
 
-    def create_merge_request(self, project, project_file, content):
+    def is_optout(self, project, branch):
+        """Check if the project decived to be 'optout' for a specific version
+
+        :param project: Project object from GitLab
+        :type project: gitlab.Project
+
+        :param branch: branch's name used by the merge request
+        :type branch: str
+
+        :return: True if the project is optout, False otherwise
+        :rtype: bool
+        """
+        for merge_request in project.mergerequests.list():
+            if (
+                merge_request.state == "closed"
+                and merge_request.source_branch == branch
+            ):
+                return True
+        return False
+
+    def create_merge_request(
+        self, project, project_file, template_file_signature, content
+    ):
         """Create a merge request to propose the new content version
 
         :param project: Project object from GitLab
@@ -150,11 +172,22 @@ class GitlabHelper(object):
         :param project_file: Project file object from GitLab
         :type project_file: gitlab.ProjectFile
 
+        :param template_file_signature:
+        :type template_file_signature:
+
         :param content: Content file added
         :type content: str
         """
-        # TODO: improve the way to retrieve current branch or merge request to avoid multiple GitLab calls
-        branch = f"volatile_{project_file.file_path}"
+        branch_hash = sha256(template_file_signature.encode()).hexdigest()
+        branch = f"volatile_{branch_hash}"
+
+        if self.is_optout(project=project, branch=branch):
+            logging.info(
+                f"{project.name} :: {project_file.file_path} :: merge request :: optout"
+            )
+            PROMETHEUS_PROJECTS_REFUSED.inc()
+            return None
+
         try:
             project.branches.delete(branch)
         except Exception:  # nosec
@@ -173,6 +206,9 @@ class GitlabHelper(object):
                 "target_branch": project.default_branch,
                 "title": f"Volatile - new version of {project_file.file_path}",
             }
+        )
+        logging.info(
+            f"{project.name} :: {project_file.file_path} :: merge request :: create"
         )
         PROMETHEUS_PROJECTS_WAITING.inc()
 
@@ -242,9 +278,11 @@ def main():
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: push")
             continue
 
-        logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: merge request")
         gitlab_helper.create_merge_request(
-            project=project, project_file=gitlab_file, content=template_file_content
+            project=project,
+            project_file=gitlab_file,
+            template_file_signature=template_file_signature,
+            content=template_file_content,
         )
     # TODO: support push-gateway
     logging.debug("waiting the silly scrapper")

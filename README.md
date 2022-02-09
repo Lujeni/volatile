@@ -11,6 +11,7 @@ I didn't find anything simple so I started this little script.
 - Add new task on every `.gitlab-ci.yml` (check [examples](Volatile/templates/example.yml))
 - Apply new change on particular file (e.g. gitignore)
 - In the context of governance, ensure that all projects have this content on this specific file
+- Optout system, user can close the merge request, Volatile considered this specific template version as optout
 
 ### Similar (and/or better) tool
 - https://github.com/lindell/multi-gitter
