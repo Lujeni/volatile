@@ -49,7 +49,7 @@ def get_signature_from_gitlab_file(file):
 
 
 class GitlabHelper(object):
-    def __init__(self, url, token, timeout, search, mr_description):
+    def __init__(self, url, token, timeout, search, mr_description, dry_run):
         self.client = None
         self.timeout = timeout
         self.token = token
@@ -58,6 +58,7 @@ class GitlabHelper(object):
         self.groups = []
         #
         self.mr_description = mr_description
+        self.dry_run = dry_run
 
     def connect(self):
         """Performs an authentication via private token
@@ -198,15 +199,16 @@ class GitlabHelper(object):
             project=project, project_file=project_file, content=content, branch=branch
         )
 
-        project.mergerequests.create(
-            {
-                "description": self.mr_description,
-                "remove_source_branch": True,
-                "source_branch": branch,
-                "target_branch": project.default_branch,
-                "title": f"Volatile - new version of {project_file.file_path}",
-            }
-        )
+        if not self.dry_run:
+            project.mergerequests.create(
+                {
+                    "description": self.mr_description,
+                    "remove_source_branch": True,
+                    "source_branch": branch,
+                    "target_branch": project.default_branch,
+                    "title": f"Volatile - new version of {project_file.file_path}",
+                }
+            )
         logging.info(
             f"{project.name} :: {project_file.file_path} :: merge request :: create"
         )
@@ -224,6 +226,7 @@ def main():
     #
     VOLATILE_TEMPLATE_PATH = getenv("VOLATILE_TEMPLATE_PATH")
     VOLATILE_MERGE_REQUEST = literal_eval(getenv("VOLATILE_MERGE_REQUEST", "True"))
+    VOLATILE_DRY_RUN = literal_eval(getenv("VOLATILE_DRY_RUN", "True"))
 
     if not GITLAB_URL:
         print("missing variable GITLAB_URL")
@@ -251,6 +254,7 @@ def main():
         timeout=GITLAB_TIMEOUT,
         search=GITLAB_SEARCH,
         mr_description=GITLAB_MR_DESCRIPTION,
+        dry_run=VOLATILE_DRY_RUN,
     )
 
     start_http_server(8000)
@@ -272,9 +276,12 @@ def main():
             continue
 
         if not VOLATILE_MERGE_REQUEST:
-            gitlab_helper.merge_content(
-                project=project, project_file=gitlab_file, content=template_file_content
-            )
+            if not VOLATILE_DRY_RUN:
+                gitlab_helper.merge_content(
+                    project=project,
+                    project_file=gitlab_file,
+                    content=template_file_content,
+                )
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: push")
             continue
 
