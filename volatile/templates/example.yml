@@ -1,2 +1,4 @@
 include:
-  - template: Security/SAST.gitlab-ci.yml
+  - project: guild-backend/gitlab-ci
+    ref: main
+    file: ci-jobs/sast.yml
