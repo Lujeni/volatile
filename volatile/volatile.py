@@ -49,11 +49,14 @@ def get_signature_from_gitlab_file(file):
 
 
 class GitlabHelper(object):
-    def __init__(self, url, token, timeout, search, mr_description, dry_run):
+    def __init__(
+        self, url, token, timeout, search, search_in_group, mr_description, dry_run
+    ):
         self.client = None
         self.timeout = timeout
         self.token = token
         self.search = search
+        self.search_in_group = search_in_group
         self.url = url
         self.groups = []
         #
@@ -81,12 +84,21 @@ class GitlabHelper(object):
         :rtype: list
         """
         try:
-            projects = [
-                self.client.projects.get(project.id)
-                for project in self.client.projects.list(
-                    all=True, include_subgroups=True, search=self.search or ""
-                )
-            ]
+            projects = []
+            if self.search_in_group:
+                groups = self.client.groups.list(search=self.search_in_group)
+                for group in groups:
+                    for group_project in group.projects.list(
+                        all=True, include_subgroups=True
+                    ):
+                        projects.append(self.client.projects.get(group_project.id))
+            else:
+                projects = [
+                    self.client.projects.get(project.id)
+                    for project in self.client.projects.list(
+                        all=True, include_subgroups=True, search=self.search or ""
+                    )
+                ]
             PROMETHEUS_PROJECTS_TOTAL.set(len(projects))
             return projects
         except Exception as e:
@@ -189,17 +201,20 @@ class GitlabHelper(object):
             PROMETHEUS_PROJECTS_REFUSED.inc()
             return None
 
-        try:
-            project.branches.delete(branch)
-        except Exception:  # nosec
-            pass
-
-        project.branches.create({"branch": branch, "ref": project.default_branch})
-        self.merge_content(
-            project=project, project_file=project_file, content=content, branch=branch
-        )
-
         if not self.dry_run:
+            try:
+                project.branches.delete(branch)
+            except Exception:  # nosec
+                pass
+
+            project.branches.create({"branch": branch, "ref": project.default_branch})
+            self.merge_content(
+                project=project,
+                project_file=project_file,
+                content=content,
+                branch=branch,
+            )
+
             project.mergerequests.create(
                 {
                     "description": self.mr_description,
@@ -221,6 +236,7 @@ def main():
     GITLAB_TARGET_FILE = getenv("GITLAB_TARGET_FILE")
     GITLAB_TIMEOUT = getenv("GITLAB_TIMEOUT", 3)
     GITLAB_SEARCH = getenv("GITLAB_SEARCH", None)
+    GITLAB_SEARCH_IN_GROUP = getenv("GITLAB_SEARCH_IN_GROUP", None)
     #
     GITLAB_MR_DESCRIPTION = getenv("GITLAB_MR_DESCRIPTION", None)
     #
@@ -253,6 +269,7 @@ def main():
         token=GITLAB_PRIVATE_TOKEN,
         timeout=GITLAB_TIMEOUT,
         search=GITLAB_SEARCH,
+        search_in_group=GITLAB_SEARCH_IN_GROUP,
         mr_description=GITLAB_MR_DESCRIPTION,
         dry_run=VOLATILE_DRY_RUN,
     )

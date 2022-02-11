@@ -46,6 +46,7 @@ Volatile supports multiple environment variables for configuration:
 | `GITLAB_PRIVATE_TOKEN`   | [Authentication Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) | yes         | N/a     |
 | `GITLAB_TARGET_FILE`     | The GitLab file you wanna update (e.g. `.gitlab-ci.yml`)                                    | yes         | N/a     |
 | `GITLAB_SEARCH`          | Returns project matching the given pattern (default all)                                    | no          | all     |
+| `GITLAB_SEARCH_IN_GROUP` | Returns project inside this group (cant be use with GITLAB_SEARCH)                          | no          | None    |
 | `GITLAB_MR_DESCRIPTION`  | Description of MR. Limited to 1,048,576 characters                                          | no          | None    |
 | ``VOLATILE_DRY_RUN``       | It will not make any changes on remote system (GitLab)                                      | no          | True   [|](|)
 | `VOLATILE_TEMPLATE_PATH` | The path of the file with the new content (e.g. `volatile/templates/example.yml`)           | yes         | N/a     |
