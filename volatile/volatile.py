@@ -243,6 +243,7 @@ def main():
     VOLATILE_TEMPLATE_PATH = getenv("VOLATILE_TEMPLATE_PATH")
     VOLATILE_MERGE_REQUEST = literal_eval(getenv("VOLATILE_MERGE_REQUEST", "True"))
     VOLATILE_DRY_RUN = literal_eval(getenv("VOLATILE_DRY_RUN", "True"))
+    VOLATILE_PROMETHEUS_PORT = int(getenv("VOLATILE_PROMETHEUS_PORT", "8000"))
 
     if not GITLAB_URL:
         print("missing variable GITLAB_URL")
@@ -274,7 +275,7 @@ def main():
         dry_run=VOLATILE_DRY_RUN,
     )
 
-    start_http_server(8000)
+    start_http_server(VOLATILE_PROMETHEUS_PORT)
     gitlab_helper.connect()
     for project in gitlab_helper.get_projects():
         logging.info(f"{project.name} :: {GITLAB_TARGET_FILE}")

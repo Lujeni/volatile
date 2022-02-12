@@ -46,8 +46,10 @@ Volatile supports multiple environment variables for configuration:
 | `GITLAB_SEARCH_IN_GROUP` | Returns project inside this group (cant be use with GITLAB_SEARCH)                          | no          | None    |
 | `GITLAB_MR_DESCRIPTION`  | Description of MR. Limited to 1,048,576 characters                                          | no          | None    |
 | ``VOLATILE_DRY_RUN``       | It will not make any changes on remote system (GitLab)                                      | no          | True   [|](|)
-| `VOLATILE_TEMPLATE_PATH` | The path of the file with the new content (e.g. `volatile/templates/example.yml`)           | yes         | N/a     |
-| `VOLATILE_MERGE_REQUEST` | Create merge request, otherwise, script push on default branch                              | no          | True    |
+| `VOLATILE_TEMPLATE_PATH`   | The path of the file with the new content (e.g. `volatile/templates/example.yml`) | yes | N/a  |
+| `VOLATILE_MERGE_REQUEST`   | Create merge request, otherwise, script push on default branch                    | no  | True |
+| `VOLATILE_PROMETHEUS_PORT` | Prometheus HTTP port                                                              | no  | 8000 |
+
 
 
 #### Metrics
