@@ -10,11 +10,11 @@ from time import sleep
 from gitlab import Gitlab
 from prometheus_client import Gauge, start_http_server
 
-PROMETHEUS_PROJECTS_TOTAL = Gauge("volatile_projects_total", ".")
-PROMETHEUS_PROJECTS_DONE = Gauge("volatile_projects_done", ".")
-PROMETHEUS_PROJECTS_REFUSED = Gauge("volatile_projects_refused", ".")
-PROMETHEUS_PROJECTS_WAITING = Gauge("volatile_projects_waiting", ".")
-PROMETHEUS_PROJECTS_MISSING = Gauge("volatile_projects_missing", ".")
+PROMETHEUS_PROJECTS_TOTAL = Gauge("volatile_projects_total", ".", ["template"])
+PROMETHEUS_PROJECTS_DONE = Gauge("volatile_projects_done", ".", ["template"])
+PROMETHEUS_PROJECTS_REFUSED = Gauge("volatile_projects_refused", ".", ["template"])
+PROMETHEUS_PROJECTS_WAITING = Gauge("volatile_projects_waiting", ".", ["template"])
+PROMETHEUS_PROJECTS_MISSING = Gauge("volatile_projects_missing", ".", ["template"])
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -50,7 +50,15 @@ def get_signature_from_gitlab_file(file):
 
 class GitlabHelper(object):
     def __init__(
-        self, url, token, timeout, search, search_in_group, mr_description, dry_run
+        self,
+        url,
+        token,
+        timeout,
+        search,
+        search_in_group,
+        mr_description,
+        dry_run,
+        volatile_template_path,
     ):
         self.client = None
         self.timeout = timeout
@@ -62,6 +70,8 @@ class GitlabHelper(object):
         #
         self.mr_description = mr_description
         self.dry_run = dry_run
+        #
+        self.volatile_template_path = volatile_template_path
 
     def connect(self):
         """Performs an authentication via private token
@@ -99,7 +109,9 @@ class GitlabHelper(object):
                         all=True, include_subgroups=True, search=self.search or ""
                     )
                 ]
-            PROMETHEUS_PROJECTS_TOTAL.set(len(projects))
+            PROMETHEUS_PROJECTS_TOTAL.labels(template=self.volatile_template_path).set(
+                len(projects)
+            )
             return projects
         except Exception as e:
             logging.error("unable to get projects :: {}".format(e))
@@ -198,7 +210,9 @@ class GitlabHelper(object):
             logging.info(
                 f"{project.name} :: {project_file.file_path} :: merge request :: optout"
             )
-            PROMETHEUS_PROJECTS_REFUSED.inc()
+            PROMETHEUS_PROJECTS_REFUSED.labels(
+                template=self.volatile_template_path
+            ).inc()
             return None
 
         if not self.dry_run:
@@ -227,7 +241,7 @@ class GitlabHelper(object):
         logging.info(
             f"{project.name} :: {project_file.file_path} :: merge request :: create"
         )
-        PROMETHEUS_PROJECTS_WAITING.inc()
+        PROMETHEUS_PROJECTS_WAITING.labels(template=self.volatile_template_path).inc()
 
 
 def main():
@@ -273,6 +287,7 @@ def main():
         search_in_group=GITLAB_SEARCH_IN_GROUP,
         mr_description=GITLAB_MR_DESCRIPTION,
         dry_run=VOLATILE_DRY_RUN,
+        volatile_template_path=VOLATILE_TEMPLATE_PATH,
     )
 
     start_http_server(VOLATILE_PROMETHEUS_PORT)
@@ -284,13 +299,13 @@ def main():
         )
         if not gitlab_file:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: not found")
-            PROMETHEUS_PROJECTS_MISSING.inc()
+            PROMETHEUS_PROJECTS_MISSING.labels(template=VOLATILE_TEMPLATE_PATH).inc()
             continue
 
         gitlab_file_signature = get_signature_from_gitlab_file(file=gitlab_file)
         if template_file_signature in gitlab_file_signature:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: already good")
-            PROMETHEUS_PROJECTS_DONE.inc()
+            PROMETHEUS_PROJECTS_DONE.labels(template=VOLATILE_TEMPLATE_PATH).inc()
             continue
 
         if not VOLATILE_MERGE_REQUEST:
