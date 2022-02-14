@@ -10,11 +10,31 @@ from time import sleep
 from gitlab import Gitlab
 from prometheus_client import Gauge, start_http_server
 
-PROMETHEUS_PROJECTS_TOTAL = Gauge("volatile_projects_total", ".", ["template"])
-PROMETHEUS_PROJECTS_DONE = Gauge("volatile_projects_done", ".", ["template"])
-PROMETHEUS_PROJECTS_REFUSED = Gauge("volatile_projects_refused", ".", ["template"])
-PROMETHEUS_PROJECTS_WAITING = Gauge("volatile_projects_waiting", ".", ["template"])
-PROMETHEUS_PROJECTS_MISSING = Gauge("volatile_projects_missing", ".", ["template"])
+PROMETHEUS_PROJECTS_TOTAL = Gauge(
+    "volatile_projects_total",
+    ".",
+    ["template", "gitlab_search", "gitlab_search_in_group"],
+)
+PROMETHEUS_PROJECTS_DONE = Gauge(
+    "volatile_projects_done",
+    ".",
+    ["template", "gitlab_search", "gitlab_search_in_group"],
+)
+PROMETHEUS_PROJECTS_REFUSED = Gauge(
+    "volatile_projects_refused",
+    ".",
+    ["template", "gitlab_search", "gitlab_search_in_group"],
+)
+PROMETHEUS_PROJECTS_WAITING = Gauge(
+    "volatile_projects_waiting",
+    ".",
+    ["template", "gitlab_search", "gitlab_search_in_group"],
+)
+PROMETHEUS_PROJECTS_MISSING = Gauge(
+    "volatile_projects_missing",
+    ".",
+    ["template", "gitlab_search", "gitlab_search_in_group"],
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -109,9 +129,11 @@ class GitlabHelper(object):
                         all=True, include_subgroups=True, search=self.search or ""
                     )
                 ]
-            PROMETHEUS_PROJECTS_TOTAL.labels(template=self.volatile_template_path).set(
-                len(projects)
-            )
+            PROMETHEUS_PROJECTS_TOTAL.labels(
+                template=self.volatile_template_path,
+                gitlab_search=self.search,
+                gitlab_search_in_group=self.search_in_group,
+            ).set(len(projects))
             return projects
         except Exception as e:
             logging.error("unable to get projects :: {}".format(e))
@@ -211,7 +233,9 @@ class GitlabHelper(object):
                 f"{project.name} :: {project_file.file_path} :: merge request :: optout"
             )
             PROMETHEUS_PROJECTS_REFUSED.labels(
-                template=self.volatile_template_path
+                template=self.volatile_template_path,
+                gitlab_search=self.search,
+                gitlab_search_in_group=self.search_in_group,
             ).inc()
             return None
 
@@ -241,7 +265,11 @@ class GitlabHelper(object):
         logging.info(
             f"{project.name} :: {project_file.file_path} :: merge request :: create"
         )
-        PROMETHEUS_PROJECTS_WAITING.labels(template=self.volatile_template_path).inc()
+        PROMETHEUS_PROJECTS_WAITING.labels(
+            template=self.volatile_template_path,
+            gitlab_search=self.search,
+            gitlab_search_in_group=self.search_in_group,
+        ).inc()
 
 
 def main():
@@ -299,13 +327,21 @@ def main():
         )
         if not gitlab_file:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: not found")
-            PROMETHEUS_PROJECTS_MISSING.labels(template=VOLATILE_TEMPLATE_PATH).inc()
+            PROMETHEUS_PROJECTS_MISSING.labels(
+                template=VOLATILE_TEMPLATE_PATH,
+                gitlab_search=GITLAB_SEARCH,
+                gitlab_search_in_group=GITLAB_SEARCH_IN_GROUP,
+            ).inc()
             continue
 
         gitlab_file_signature = get_signature_from_gitlab_file(file=gitlab_file)
         if template_file_signature in gitlab_file_signature:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: already good")
-            PROMETHEUS_PROJECTS_DONE.labels(template=VOLATILE_TEMPLATE_PATH).inc()
+            PROMETHEUS_PROJECTS_DONE.labels(
+                template=VOLATILE_TEMPLATE_PATH,
+                gitlab_search=GITLAB_SEARCH,
+                gitlab_search_in_group=GITLAB_SEARCH_IN_GROUP,
+            ).inc()
             continue
 
         if not VOLATILE_MERGE_REQUEST:
@@ -326,7 +362,7 @@ def main():
         )
     # TODO: support push-gateway
     logging.debug("waiting the silly scrapper")
-    sleep(120)
+    sleep(240)
 
 
 if __name__ == "__main__":
