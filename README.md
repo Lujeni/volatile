@@ -37,24 +37,25 @@ $ virtualenv .venv && source .venv/bin/activate
 #### Configuration
 Volatile supports multiple environment variables for configuration:
 
-| Flag                     | Description                                                                                 | Mandatory   | Default |
-|--------------------------|---------------------------------------------------------------------------------------------|-------------|---------|
-| `GITLAB_URL`             | Your GitLab instance (e.g. https://gitlab.foo.bar)                                          | yes         | N/a     |
-| `GITLAB_PRIVATE_TOKEN`   | [Authentication Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) | yes         | N/a     |
-| `GITLAB_TARGET_FILE`     | The GitLab file you wanna update (e.g. `.gitlab-ci.yml`)                                    | yes         | N/a     |
-| `GITLAB_SEARCH`          | Returns project matching the given pattern (default all)                                    | no          | all     |
-| `GITLAB_SEARCH_IN_GROUP` | Returns project inside this group (cant be use with GITLAB_SEARCH)                          | no          | None    |
-| `GITLAB_MR_DESCRIPTION`  | Description of MR. Limited to 1,048,576 characters                                          | no          | None    |
-| ``VOLATILE_DRY_RUN``       | It will not make any changes on remote system (GitLab)                                      | no          | True   [|](|)
-| `VOLATILE_TEMPLATE_PATH`   | The path of the file with the new content (e.g. `volatile/templates/example.yml`) | yes | N/a  |
-| `VOLATILE_MERGE_REQUEST`   | Create merge request, otherwise, script push on default branch                    | no  | True |
-| `VOLATILE_PROMETHEUS_PORT` | Prometheus HTTP port                                                              | no  | 8000 |
-
+| Flag                          | Description                                                                                 | Mandatory | Default      |
+|-------------------------------|---------------------------------------------------------------------------------------------|-----------|--------------|
+| `GITLAB_URL`                  | Your GitLab instance (e.g. https://gitlab.foo.bar)                                          | yes       | N/a          |
+| `GITLAB_PRIVATE_TOKEN`        | [Authentication Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) | yes       | N/a          |
+| `GITLAB_TARGET_FILE`          | The GitLab file you wanna update (e.g. `.gitlab-ci.yml`)                                    | yes       | N/a          |
+| `GITLAB_SEARCH`               | Returns project matching the given pattern (default all)                                    | no        | all          |
+| `GITLAB_SEARCH_IN_GROUP`      | Returns project inside this group (cant be use with GITLAB_SEARCH)                          | no        | None         |
+| `GITLAB_MR_DESCRIPTION`       | Description of MR. Limited to 1,048,576 characters                                          | no        | None         |
+| ``VOLATILE_DRY_RUN``          | It will not make any changes on remote system (GitLab)                                      | no        | True         |
+| `VOLATILE_TEMPLATE_PATH`      | The path of the file with the new content (e.g. `volatile/templates/example.yml`)           | yes       | N/a          |
+| `VOLATILE_MERGE_REQUEST`      | Create merge request, otherwise, script push on default branch                              | no        | True         |
+| `VOLATILE_PROMETHEUS_PORT`    | Prometheus HTTP port                                                                        | no        | 8000         |
+| `VOLATILE_PROMETHEUS_GATEWAY` | The Prometheus Gateway address                                                              | no        | N/a          |
 
 
 #### Metrics
-Volatile expose a temporary prometheus HTTP server with few metrics.
+By default, Volatile expose a temporary prometheus HTTP server with few metrics.
 The main goal is to track the adoption of your template.
+If you prefer, you can use a Prometheus Gateway (check configuration above).
 
 ![](example_metrics.png)
 

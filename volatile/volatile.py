@@ -8,32 +8,11 @@ from sys import exit
 from time import sleep
 
 from gitlab import Gitlab
-from prometheus_client import Gauge, start_http_server
-
-PROMETHEUS_PROJECTS_TOTAL = Gauge(
-    "volatile_projects_total",
-    ".",
-    ["template", "gitlab_search", "gitlab_search_in_group"],
-)
-PROMETHEUS_PROJECTS_DONE = Gauge(
-    "volatile_projects_done",
-    ".",
-    ["template", "gitlab_search", "gitlab_search_in_group"],
-)
-PROMETHEUS_PROJECTS_REFUSED = Gauge(
-    "volatile_projects_refused",
-    ".",
-    ["template", "gitlab_search", "gitlab_search_in_group"],
-)
-PROMETHEUS_PROJECTS_WAITING = Gauge(
-    "volatile_projects_waiting",
-    ".",
-    ["template", "gitlab_search", "gitlab_search_in_group"],
-)
-PROMETHEUS_PROJECTS_MISSING = Gauge(
-    "volatile_projects_missing",
-    ".",
-    ["template", "gitlab_search", "gitlab_search_in_group"],
+from prometheus_client import (
+    CollectorRegistry,
+    Gauge,
+    push_to_gateway,
+    start_http_server,
 )
 
 logging.basicConfig(
@@ -79,6 +58,7 @@ class GitlabHelper(object):
         mr_description,
         dry_run,
         volatile_template_path,
+        metrics,
     ):
         self.client = None
         self.timeout = timeout
@@ -92,6 +72,8 @@ class GitlabHelper(object):
         self.dry_run = dry_run
         #
         self.volatile_template_path = volatile_template_path
+        #
+        self.metrics = metrics
 
     def connect(self):
         """Performs an authentication via private token
@@ -129,7 +111,7 @@ class GitlabHelper(object):
                         all=True, include_subgroups=True, search=self.search or ""
                     )
                 ]
-            PROMETHEUS_PROJECTS_TOTAL.labels(
+            self.metrics["total"].labels(
                 template=self.volatile_template_path,
                 gitlab_search=self.search,
                 gitlab_search_in_group=self.search_in_group,
@@ -232,7 +214,7 @@ class GitlabHelper(object):
             logging.info(
                 f"{project.name} :: {project_file.file_path} :: merge request :: optout"
             )
-            PROMETHEUS_PROJECTS_REFUSED.labels(
+            self.metrics["refused"].labels(
                 template=self.volatile_template_path,
                 gitlab_search=self.search,
                 gitlab_search_in_group=self.search_in_group,
@@ -265,7 +247,7 @@ class GitlabHelper(object):
         logging.info(
             f"{project.name} :: {project_file.file_path} :: merge request :: create"
         )
-        PROMETHEUS_PROJECTS_WAITING.labels(
+        self.metrics["waiting"].labels(
             template=self.volatile_template_path,
             gitlab_search=self.search,
             gitlab_search_in_group=self.search_in_group,
@@ -286,6 +268,7 @@ def main():
     VOLATILE_MERGE_REQUEST = literal_eval(getenv("VOLATILE_MERGE_REQUEST", "True"))
     VOLATILE_DRY_RUN = literal_eval(getenv("VOLATILE_DRY_RUN", "True"))
     VOLATILE_PROMETHEUS_PORT = int(getenv("VOLATILE_PROMETHEUS_PORT", "8000"))
+    VOLATILE_PROMETHEUS_GATEWAY = getenv("VOLATILE_PROMETHEUS_GATEWAY", "")
 
     if not GITLAB_URL:
         print("missing variable GITLAB_URL")
@@ -307,6 +290,40 @@ def main():
         path=VOLATILE_TEMPLATE_PATH
     )
 
+    # prometheus stuff
+    metrics = {}
+    metrics["total"] = Gauge(
+        "volatile_projects_total",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
+    metrics["done"] = Gauge(
+        "volatile_projects_done",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
+    metrics["refused"] = Gauge(
+        "volatile_projects_refused",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
+    metrics["waiting"] = Gauge(
+        "volatile_projects_waiting",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
+    metrics["missing"] = Gauge(
+        "volatile_projects_missing",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
+    registry = CollectorRegistry()
+    if not VOLATILE_PROMETHEUS_GATEWAY:
+        start_http_server(VOLATILE_PROMETHEUS_PORT)
+    else:
+        for metric in metrics:
+            metrics[metric].registry = registry
+
     gitlab_helper = GitlabHelper(
         url=GITLAB_URL,
         token=GITLAB_PRIVATE_TOKEN,
@@ -316,9 +333,9 @@ def main():
         mr_description=GITLAB_MR_DESCRIPTION,
         dry_run=VOLATILE_DRY_RUN,
         volatile_template_path=VOLATILE_TEMPLATE_PATH,
+        metrics=metrics,
     )
 
-    start_http_server(VOLATILE_PROMETHEUS_PORT)
     gitlab_helper.connect()
     for project in gitlab_helper.get_projects():
         logging.info(f"{project.name} :: {GITLAB_TARGET_FILE}")
@@ -327,7 +344,7 @@ def main():
         )
         if not gitlab_file:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: not found")
-            PROMETHEUS_PROJECTS_MISSING.labels(
+            metrics["missing"].labels(
                 template=VOLATILE_TEMPLATE_PATH,
                 gitlab_search=GITLAB_SEARCH,
                 gitlab_search_in_group=GITLAB_SEARCH_IN_GROUP,
@@ -337,7 +354,7 @@ def main():
         gitlab_file_signature = get_signature_from_gitlab_file(file=gitlab_file)
         if template_file_signature in gitlab_file_signature:
             logging.info(f"{project.name} :: {GITLAB_TARGET_FILE} :: already good")
-            PROMETHEUS_PROJECTS_DONE.labels(
+            metrics["done"].labels(
                 template=VOLATILE_TEMPLATE_PATH,
                 gitlab_search=GITLAB_SEARCH,
                 gitlab_search_in_group=GITLAB_SEARCH_IN_GROUP,
@@ -360,7 +377,14 @@ def main():
             template_file_signature=template_file_signature,
             content=template_file_content,
         )
-    # TODO: support push-gateway
+
+    if VOLATILE_PROMETHEUS_GATEWAY:
+        logging.info("push metrics via gateway")
+        push_to_gateway(
+            VOLATILE_PROMETHEUS_GATEWAY, job="batch-volatile", registry=registry
+        )
+        logging.info("push metrics via gateway done")
+        return
     logging.debug("waiting the silly scrapper")
     sleep(240)
 
