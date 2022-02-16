@@ -1,6 +1,7 @@
 #!/usr/bin/python env
 import logging
 from ast import literal_eval
+from fnmatch import fnmatch
 from hashlib import sha256
 from os import getenv
 from pathlib import Path
@@ -59,6 +60,7 @@ class GitlabHelper(object):
         dry_run,
         volatile_template_path,
         metrics,
+        exclude,
     ):
         self.client = None
         self.timeout = timeout
@@ -67,6 +69,7 @@ class GitlabHelper(object):
         self.search_in_group = search_in_group
         self.url = url
         self.groups = []
+        self.exclude = exclude
         #
         self.mr_description = mr_description
         self.dry_run = dry_run
@@ -74,6 +77,10 @@ class GitlabHelper(object):
         self.volatile_template_path = volatile_template_path
         #
         self.metrics = metrics
+        print(self)
+
+    def __repr__(self):
+        return f"url={self.url} :: timeout={self.timeout} :: search={self.search} :: search_in_group={self.search_in_group} :: mr_description={self.mr_description} :: dry_run={self.dry_run} :: volatile_template_path={self.volatile_template_path} :: exclude={self.exclude}"
 
     def connect(self):
         """Performs an authentication via private token
@@ -97,20 +104,31 @@ class GitlabHelper(object):
         """
         try:
             projects = []
+            project_reference = []
             if self.search_in_group:
                 groups = self.client.groups.list(search=self.search_in_group)
                 for group in groups:
-                    for group_project in group.projects.list(
+                    project_reference += group.projects.list(
                         all=True, include_subgroups=True
-                    ):
-                        projects.append(self.client.projects.get(group_project.id))
-            else:
-                projects = [
-                    self.client.projects.get(project.id)
-                    for project in self.client.projects.list(
-                        all=True, include_subgroups=True, search=self.search or ""
                     )
-                ]
+            else:
+                project_reference = self.client.projects.list(
+                    all=True, include_subgroups=True, search=self.search or ""
+                )
+
+            for project in project_reference:
+                _project = self.client.projects.get(project.id)
+                for exclude_pattern in self.exclude:
+                    if fnmatch(_project.name, exclude_pattern):
+                        logging.info(f"get_projects :: {_project.name} :: exclude=True")
+                        self.metrics["excluded"].labels(
+                            template=self.volatile_template_path,
+                            gitlab_search=self.search,
+                            gitlab_search_in_group=self.search_in_group,
+                        ).inc(1)
+                        break
+                else:
+                    projects.append(_project)
             self.metrics["total"].labels(
                 template=self.volatile_template_path,
                 gitlab_search=self.search,
@@ -261,6 +279,9 @@ def main():
     GITLAB_TIMEOUT = getenv("GITLAB_TIMEOUT", 3)
     GITLAB_SEARCH = getenv("GITLAB_SEARCH", None)
     GITLAB_SEARCH_IN_GROUP = getenv("GITLAB_SEARCH_IN_GROUP", None)
+    GITLAB_EXCLUDE = getenv("GITLAB_EXCLUDE", [])
+    if GITLAB_EXCLUDE:
+        GITLAB_EXCLUDE = GITLAB_EXCLUDE.split(",")
     #
     GITLAB_MR_DESCRIPTION = getenv("GITLAB_MR_DESCRIPTION", None)
     #
@@ -317,6 +338,11 @@ def main():
         ".",
         ["template", "gitlab_search", "gitlab_search_in_group"],
     )
+    metrics["excluded"] = Gauge(
+        "volatile_projects_excluded",
+        ".",
+        ["template", "gitlab_search", "gitlab_search_in_group"],
+    )
     registry = CollectorRegistry()
     if not VOLATILE_PROMETHEUS_GATEWAY:
         start_http_server(VOLATILE_PROMETHEUS_PORT)
@@ -334,6 +360,7 @@ def main():
         dry_run=VOLATILE_DRY_RUN,
         volatile_template_path=VOLATILE_TEMPLATE_PATH,
         metrics=metrics,
+        exclude=GITLAB_EXCLUDE,
     )
 
     gitlab_helper.connect()
