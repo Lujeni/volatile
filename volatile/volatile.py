@@ -189,7 +189,7 @@ class GitlabHelper(object):
             return None
 
     def is_optout(self, project, branch):
-        """Check if the project decived to be 'optout' for a specific version
+        """Check if the project decided to be 'optout' for a specific version
 
         :param project: Project object from GitLab
         :type project: gitlab.Project
@@ -203,6 +203,26 @@ class GitlabHelper(object):
         for merge_request in project.mergerequests.list():
             if (
                 merge_request.state == "closed"
+                and merge_request.source_branch == branch
+            ):
+                return True
+        return False
+
+    def is_waiting(self, project, branch):
+        """Check if the project 'waiting' for a specific version
+
+        :param project: Project object from GitLab
+        :type project: gitlab.Project
+
+        :param branch: branch's name used by the merge request
+        :type branch: str
+
+        :return: True if the project is optout, False otherwise
+        :rtype: bool
+        """
+        for merge_request in project.mergerequests.list():
+            if (
+                merge_request.state == "opened"
                 and merge_request.source_branch == branch
             ):
                 return True
@@ -233,6 +253,17 @@ class GitlabHelper(object):
                 f"{project.name} :: {project_file.file_path} :: merge request :: optout"
             )
             self.metrics["refused"].labels(
+                template=self.volatile_template_path,
+                gitlab_search=self.search,
+                gitlab_search_in_group=self.search_in_group,
+            ).inc()
+            return None
+
+        if self.is_waiting(project=project, branch=branch):
+            logging.info(
+                f"{project.name} :: {project_file.file_path} :: merge request :: waiting"
+            )
+            self.metrics["waiting"].labels(
                 template=self.volatile_template_path,
                 gitlab_search=self.search,
                 gitlab_search_in_group=self.search_in_group,
@@ -406,11 +437,11 @@ def main():
         )
 
     if VOLATILE_PROMETHEUS_GATEWAY:
-        logging.info("push metrics via gateway")
+        logging.info(f"push metrics via gateway :: {VOLATILE_PROMETHEUS_GATEWAY}")
         push_to_gateway(
             VOLATILE_PROMETHEUS_GATEWAY, job="batch-volatile", registry=registry
         )
-        logging.info("push metrics via gateway done")
+        logging.info(f"push metrics via gateway :: done")
         return
     logging.debug("waiting the silly scrapper")
     sleep(240)
