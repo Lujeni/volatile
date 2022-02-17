@@ -343,43 +343,81 @@ def main():
     )
 
     # prometheus stuff
-    metrics = {}
-    metrics["total"] = Gauge(
-        "volatile_projects_total",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
-    metrics["done"] = Gauge(
-        "volatile_projects_done",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
-    metrics["refused"] = Gauge(
-        "volatile_projects_refused",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
-    metrics["waiting"] = Gauge(
-        "volatile_projects_waiting",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
-    metrics["missing"] = Gauge(
-        "volatile_projects_missing",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
-    metrics["excluded"] = Gauge(
-        "volatile_projects_excluded",
-        ".",
-        ["template", "gitlab_search", "gitlab_search_in_group"],
-    )
     registry = CollectorRegistry()
+    metrics = {}
+
+    # I dunno why registry=None disabled pull system
+    if VOLATILE_PROMETHEUS_GATEWAY:
+        metrics["total"] = Gauge(
+            "volatile_projects_total",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+        metrics["done"] = Gauge(
+            "volatile_projects_done",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+        metrics["refused"] = Gauge(
+            "volatile_projects_refused",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+        metrics["waiting"] = Gauge(
+            "volatile_projects_waiting",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+        metrics["missing"] = Gauge(
+            "volatile_projects_missing",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+        metrics["excluded"] = Gauge(
+            "volatile_projects_excluded",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+            registry=registry,
+        )
+    else:
+        metrics["total"] = Gauge(
+            "volatile_projects_total",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+        metrics["done"] = Gauge(
+            "volatile_projects_done",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+        metrics["refused"] = Gauge(
+            "volatile_projects_refused",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+        metrics["waiting"] = Gauge(
+            "volatile_projects_waiting",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+        metrics["missing"] = Gauge(
+            "volatile_projects_missing",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+        metrics["excluded"] = Gauge(
+            "volatile_projects_excluded",
+            ".",
+            ["template", "gitlab_search", "gitlab_search_in_group"],
+        )
+
     if not VOLATILE_PROMETHEUS_GATEWAY:
         start_http_server(VOLATILE_PROMETHEUS_PORT)
-    else:
-        for metric in metrics:
-            metrics[metric].registry = registry
 
     gitlab_helper = GitlabHelper(
         url=GITLAB_URL,
@@ -441,7 +479,7 @@ def main():
         push_to_gateway(
             VOLATILE_PROMETHEUS_GATEWAY, job="batch-volatile", registry=registry
         )
-        logging.info(f"push metrics via gateway :: done")
+        logging.info("push metrics via gateway :: done")
         return
     logging.debug("waiting the silly scrapper")
     sleep(240)
